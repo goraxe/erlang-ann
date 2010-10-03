@@ -2,8 +2,8 @@
 -export([main/1]).
 
 main([]) ->
-    main('main');
+    io:format("a network file is needed~n"),
+    erlang:halt();
 main(Arg) ->
-    _Net = network:new(Arg),
-    Net = network:add_neuron(_Net,neuron),
+    Net = network:load_from_file(Arg),
     network:display(Net).
