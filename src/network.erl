@@ -4,42 +4,121 @@
 -export([new/1, load_from_file/1]).
 
 % fiddle my network
--export([add_neuron/2]).
+-export([add_neuron/2, train/1]).
 
 % show me the money 
 -export([display/1]).
 
+-include("network.hrl").
+
 new(Name) ->
-    { network, Name, neurons, [] }.
+    #network { name = Name, neurons = orddict:new(), patterns = orddict:new(), inputs = orddict:new()}.
 
 
 display(Network) ->
     io:format("Network ~p~n", [ Network ]).
 
-add_neuron({network,  Name, neurons, Neurons},  Neuron) ->
-    {network, Name, neurons, [  Neuron | Neurons ] }.
+add_neuron(Network = #network{ neurons = Neurons },  Neuron) ->
+    Network#network{neurons= orddict:store( neuron:name(Neuron), Neuron , Neurons ) }.
+
+add_input(Network = #network{ inputs = Inputs }, InputName, NeuronName) ->
+    { ok , Neuron } = get_neuron(Network, NeuronName ),
+    Input = #input { name =InputName, output = Neuron },
+    Network#network{inputs = orddict:store( InputName, Input, Inputs ) }.
+
+add_pattern(Network = #network{ patterns = Patterns }, PatternName, Pattern) ->
+    Network#network{patterns = orddict:store( PatternName, Pattern, Patterns ) }.
+
+add_connection(Network, NeuronName1, NeuronName2, Weight) ->
+    { ok, Neuron1 } = get_neuron(Network, NeuronName1),
+    { ok, Neuron2 } = get_neuron(Network, NeuronName2),
+    { NewWeight , [] } = string:to_integer(Weight),
+    { ok } = neuron:connect(Neuron1, Neuron2, NewWeight),
+    Network.
+
+add_output(Network, OutputName, NeuronName) -> 
+    { ok, Neuron } = get_neuron(Network, NeuronName),
+    { ok } = neuron:connect(Neuron, self()),
+    Network.
+
+get_neuron(Network, NeuronName) ->
+    Neuron  = orddict:fetch(NeuronName, Network#network.neurons),
+    { ok, Neuron }.
+
+get_input(Network, InputName) ->
+    Input = orddict:fetch(InputName, Network#network.inputs),
+    { ok, Input }.
+
+send_input_value(Network, InputName, Value) ->
+    { ok, Input }  = get_input(Network, InputName),
+    io:format("attempting to send input sig to ~p~n", [Input]),
+    Neuron = Input#input.output,
+    neuron:activate(Neuron),
+    { ok }.
+
+run_train_pattern(PatternName, Pattern, Network ) -> 
+    io:format("running pattern ~s~n", [PatternName]),
+    run_pattern_part (Pattern, Network).
+
+train(Network) ->
+    orddict:fold(fun run_train_pattern/3,Network, Network#network.patterns).
+
+
+run_pattern_part ([ Type, Ref, Value | Rest ], Network) ->
+    run_pattern_part({ Type, Ref, Value }, Rest, Network);
+run_pattern_part ([], Network) ->
+    Network.
+
+
+run_pattern_part({"input", Ref, Value}, Pattern, Network) ->
+    { ok } = send_input_value(Network, Ref, Value),
+    run_pattern_part(Pattern, Network);
+run_pattern_part({"output", Ref, Value}, Pattern, Network) ->
+    receive 
+        Foo -> 
+            io:format("got output message ~p~n", [Foo])
+    end,
+    run_pattern_part(Pattern, Network).
 
 load_from_file(File) ->
-    io:format("attempting to load from file ~s~n", File),
+%    io:format("attempting to load from file ~s~n", File),
     {ok, Device} = file:open(File, [read]),
     Net = new(File),
     process_line(Device,Net).
 
+
 process_line(Device,Net) ->
     case io:get_line(Device, "") of
-        eof  -> file:close(Device);
+        eof  -> file:close(Device), Net;
         Line -> 
-            io:format("recieved line ~p~n", [Line]),
+%            io:format("recieved line ~p~n", [Line]),
             NewNet = parse(Line, Net),
-%            NewNet = Net,
             process_line(Device,NewNet)
-    end,
-    {ok, Net}.
+    end.
+
+
+% ignore new lines
 parse("\n", Net) ->
     Net;
-parse(Line, Net) ->
-     io:format("parsing line ~p~n", [Line]),
-     parse_tokens(string:tokens(Line, " "), Net).
-parse_tokens(["{","neuron:", Name, "}\n"], Net) ->
-    Neuron = neuron:new(Name),
-    add_neuron(Net, Neuron).
+% tokenise the line
+parse(Line, Net)  ->
+     [NewLine] = string:tokens(Line, "\n"),
+     [Cmd|List] = string:tokens(NewLine, " "),
+     parse(Cmd, List, Net).
+% parse neurons
+parse("neuron:", [Name, Threshold], Net) ->
+    io:format("creating neuron ~s", [Name]),
+    Neuron = neuron:new(Name, Threshold ),
+    io:format(" ~p~n", [Neuron#neuron.pid]),
+    add_neuron(Net, Neuron);
+% parse inputs
+parse("input:", [Name, Neuron], Net) ->
+    add_input(Net, Name, Neuron);
+parse("connect:", [Neuron1, Neuron2, Weight], Net) ->
+    add_connection(Net, Neuron1, Neuron2, Weight);
+parse("output:", [Output, Neuron], Net)->
+    add_output(Net, Output, Neuron);
+parse("pattern:", [ PatternName | Pattern], Net) ->
+    add_pattern(Net, PatternName, Pattern);
+% blow up on unknown
+parse(Token, _, Net) -> false.

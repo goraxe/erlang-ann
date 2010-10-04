@@ -1,5 +1,18 @@
-{ neuron: nueron1 }
-{ neuron: nueron2 }
-{ neuron: nueron3 }
-{ neuron: nueron4 }
-{ neuron: nueron5 }
+neuron: neuron1 0
+neuron: neuron2 0
+neuron: neuron3 0.5
+neuron: neuron4 1.5
+neuron: neuron5 0.5
+input:  input1 neuron1
+input:  input2 neuron2
+connect: neuron1 neuron3 1
+connect: neuron1 neuron4 1
+connect: neuron2 neuron3 1
+connect: neuron2 neuron4 1
+connect: neuron3 neuron5 1
+connect: neuron4 neuron5 -1
+output:  output1 neuron5
+pattern: pattern1 input input1 0 input input2 0 output output1 0
+pattern: pattern2 input input1 0 input input2 1 output output1 1
+pattern: pattern3 input input1 1 input input2 0 output output1 1
+pattern: pattern4 input input1 1 input input2 1 output output1 0
