@@ -49,20 +49,25 @@ get_input(Network, InputName) ->
     Input = orddict:fetch(InputName, Network#network.inputs),
     { ok, Input }.
 
-send_input_value(Network, InputName, Value) ->
-    { ok, Input }  = get_input(Network, InputName),
-    io:format("attempting to send input sig to ~p~n", [Input]),
-    Neuron = Input#input.output,
-    neuron:activate(Neuron),
-    { ok }.
 
-run_train_pattern(PatternName, Pattern, Network ) -> 
-    io:format("running pattern ~s~n", [PatternName]),
-    run_pattern_part (Pattern, Network).
+send_input_value(Network, InputName, Value) when is_number(Value) -> 
+    { ok, Input }  = get_input(Network, InputName),
+    io:format("attempting to send  ~p sig to ~p~n", [Value, Input]),
+    Neuron = Input#input.output,
+    neuron:activate(Neuron, Value),
+    { ok };
+send_input_value(Network, InputName, Value) -> 
+    { NewValue, [] } = string:to_integer(Value),
+    send_input_value(Network, InputName, NewValue).
 
 train(Network) ->
     orddict:fold(fun run_train_pattern/3,Network, Network#network.patterns).
 
+run_train_pattern(PatternName, Pattern, Network ) -> 
+    io:format("running pattern ~s~n", [PatternName]),
+    NewNetwork = run_pattern_part (Pattern, Network),
+    orddict:map(fun (_Key, Neuron) -> neuron:reset(Neuron) end, NewNetwork#network.neurons),
+    NewNetwork.
 
 run_pattern_part ([ Type, Ref, Value | Rest ], Network) ->
     run_pattern_part({ Type, Ref, Value }, Rest, Network);
@@ -108,7 +113,8 @@ parse(Line, Net)  ->
 % parse neurons
 parse("neuron:", [Name, Threshold], Net) ->
     io:format("creating neuron ~s", [Name]),
-    Neuron = neuron:new(Name, Threshold ),
+    { NewThreshold, [] } = string:to_float(Threshold),
+    Neuron = neuron:new(Name, NewThreshold ),
     io:format(" ~p~n", [Neuron#neuron.pid]),
     add_neuron(Net, Neuron);
 % parse inputs

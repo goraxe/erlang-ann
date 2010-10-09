@@ -1,5 +1,5 @@
-neuron: neuron1 0
-neuron: neuron2 0
+neuron: neuron1 0.0
+neuron: neuron2 0.0
 neuron: neuron3 0.5
 neuron: neuron4 1.5
 neuron: neuron5 0.5
