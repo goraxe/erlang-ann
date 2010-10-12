@@ -25,9 +25,9 @@ new(Name, Threshold) ->
     new(Name, Threshold, fun sigmoid /2).
 
 new(Name, Threshold, Activate) ->
-    State = #state { threshold = Threshold },
+    State = #state { threshold = Threshold, activate = Activate },
     Pid =  spawn(?MODULE, loop, [State]),
-    #neuron { name = Name, pid = Pid, activate = Activate }.
+    #neuron { name = Name, pid = Pid  }.
 
 name(Neuron) ->
     Neuron#neuron.name.
