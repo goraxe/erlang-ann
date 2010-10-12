@@ -46,7 +46,7 @@ fire(State, [], _Value) ->
     % io:format("\t~p done sending fire messages\n", [self()]),
     State#state{fired = true };
 fire(State, [Head|Tail], Value) ->
-    io:format("\t\t ~p Sending ~p on synapsis ~p\n", [ self(), Value * Head#output.weight, Head#output.pid ]),
+    % io:format("\t\t ~p Sending ~p on synapsis ~p\n", [ self(), Value * Head#output.weight, Head#output.pid ]),
     Head#output.pid ! { self(), { fire, Value * Head#output.weight } },
     fire(State, Tail, Value).
 
@@ -61,20 +61,17 @@ activate(Neuron, Value) ->
 reset(Neuron) ->
     Neuron#neuron.pid ! { reset }.
 
+recieve_fire_message(State, Weight) ->
+    State#state{ accum = State#state.accum + Weight, waiting_for = (State#state.waiting_for - 1 ) }.
 
-inc_state_accum(State, Accum) ->
-    NewAccum = State#state.accum + Accum,
-    State#state{accum = NewAccum}.
-
-recieve_fire_message(State) ->
-    State#state{ waiting_for = (State#state.waiting_for - 1 )}.
+display_fire_message(State, Weight) -> 
+     io:format("\t ~p got fire message  Accum = ~p Weight=~p Threshold = ~p, Waiting_for ~p~n", [self(), State#state.accum, Weight, State#state.threshold, State#state.waiting_for]).
 
 loop(State) ->
     receive
         { From, { fire, Weight } } ->
             From ! {self(), ok},
-            NewState = inc_state_accum(recieve_fire_message(State), Weight),
-             io:format("\t ~p got fire message  Accum = ~p Weight=~p Threshold = ~p, Waiting_for ~p~n", [self(), NewState#state.accum, Weight, NewState#state.threshold, NewState#state.waiting_for]), 
+            NewState = recieve_fire_message(State, Weight),
             % should we broad cast our result
             case NewState#state.fired of 
                 true ->
@@ -84,7 +81,6 @@ loop(State) ->
                     case NewState#state.waiting_for =< 0.0 of
                         % if we have activated fire FIXME should do this only once
                         true ->
-                            % io:format("\t ~p threshold met going to fire\n", [self()]),
                             case  NewState#state.accum > NewState#state.threshold of 
                                 true ->
                                     loop(fire(NewState, NewState#state.outputs, 1 ));
@@ -93,8 +89,6 @@ loop(State) ->
                             end;
                         false ->
                             % have recieved all our messages
-                            % io:format("\t ~pchecking if we have all messages\n", [self()]),
-                                    % io:format("\t ~pgoing to send negative fire message\n", [self()]),
                             loop(NewState)
                     end
             end;

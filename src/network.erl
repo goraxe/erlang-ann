@@ -79,7 +79,10 @@ run_pattern_part({"input", Ref, Value}, Pattern, Network) ->
     { ok } = send_input_value(Network, Ref, Value),
     run_pattern_part(Pattern, Network);
 run_pattern_part({"output", Ref, Value}, Pattern, Network) ->
+    { ExpectedValue, [] } = string:to_integer(Value),
     receive 
+        { From, {fire, ExpectedValue}} ->
+                io:format("pattern ~p matched ~p output\n", [ Ref, ExpectedValue] );
         Foo -> 
             io:format("got output message ~p~n", [Foo])
     end,
